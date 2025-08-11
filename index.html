@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Discord User Lookup — BlockCode</title>
+<style>
+  :root{--card-radius:14px;--glass:rgba(255,255,255,0.06)}
+  html,body{height:100%;margin:0;font-family:Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(135deg,#5865F2,#7289DA);color:#fff}
+  .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{width:100%;max-width:760px;border-radius:var(--card-radius);background:linear-gradient(180deg, rgba(0,0,0,0.28), rgba(0,0,0,0.36));box-shadow:0 12px 40px rgba(7,11,24,0.5);padding:20px;transition:background 300ms ease}
+  .top{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .left{flex:1;min-width:240px}
+  .title{font-size:20px;margin:0 0 8px}
+  .input-row{display:flex;gap:8px}
+  input[type="text"]{flex:1;padding:12px;border-radius:10px;border:none;font-size:15px}
+  button{background:#5865F2;border:none;color:white;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+  button.secondary{background:rgba(255,255,255,0.06);color:#fff}
+  .right{width:320px;min-width:260px}
+  #result{margin-top:18px;background:var(--glass);padding:14px;border-radius:10px;display:none}
+  .banner{width:100%;height:140px;border-radius:10px;object-fit:cover;margin-bottom:10px;display:block}
+  .avatar{width:120px;height:120px;border-radius:50%;border:4px solid rgba(255,255,255,0.15);display:block;margin:0 auto 8px;cursor:pointer;transition:transform .18s}
+  .avatar:hover{transform:scale(1.03)}
+  .meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .badges{margin-top:8px}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,0.25);margin:4px;font-size:13px}
+  .bio{white-space:pre-wrap;margin-top:10px;color: #eee}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .small{font-size:13px;color:#d8d8d8}
+  .history{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+  .chip{background:rgba(255,255,255,0.06);padding:6px 10px;border-radius:999px;cursor:pointer}
+  .loader{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,0.12);border-top-color:#fff;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .socials a{display:inline-flex;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.04);margin:4px;color:#fff;text-decoration:none}
+  .controls{margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .copy-btn{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.06);border:none;color:#fff;cursor:pointer}
+  /* responsive */
+  @media (max-width:780px){.top{flex-direction:column}.right{width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="card">
+    <div class="top">
+      <div class="left">
+        <h3 class="title">🔎 Discord User Lookup</h3>
+        <div class="input-row">
+          <input id="userid" type="text" inputmode="numeric" placeholder="Enter Discord User ID (e.g. 123456789012345678)">
+          <button id="searchBtn">Search</button>
+          <button id="clearBtn" class="secondary">Clear</button>
+        </div>
+
+        <div class="controls">
+          <button id="copyUserBtn" class="copy-btn" title="Copy username#discriminator" style="display:none">📋 Copy Username#Discriminator</button>
+          <div id="statusText" class="small"></div>
+        </div>
+
+        <div class="history small">
+          <strong style="margin-right:8px">History:</strong>
+          <div id="historyList"></div>
+        </div>
+      </div>
+
+      <div class="right">
+        <div id="result">
+          <div id="bannerWrap"></div>
+          <a id="avatarLink" href="#" target="_blank"><img id="avatar" class="avatar" src="" alt="avatar"></a>
+          <div class="meta">
+            <div>
+              <div id="nameLine" style="font-weight:700;font-size:18px"></div>
+              <div id="idLine" class="small"></div>
+            </div>
+            <div id="botTag" class="small" style="background:rgba(0,0,0,0.25);padding:6px 8px;border-radius:8px"></div>
+          </div>
+
+          <div id="created" class="small" style="margin-top:8px"></div>
+          <div id="badges" class="badges"></div>
+          <div id="bio" class="bio"></div>
+          <div id="pronouns" class="small" style="margin-top:8px"></div>
+          <div class="socials" id="socials" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+
+function showLoader(text){
+  $('statusText').innerHTML = '<span class="loader"></span>&nbsp;&nbsp;' + (text||'Loading...');
+}
+function hideLoader(){
+  $('statusText').textContent = '';
+}
+
+function saveHistory(id){
+  if(!id) return;
+  let h = JSON.parse(localStorage.getItem('dc_history')||'[]');
+  h = h.filter(x=>x!==id);
+  h.unshift(id);
+  if(h.length>10) h.pop();
+  localStorage.setItem('dc_history', JSON.stringify(h));
+  renderHistory();
+}
+function renderHistory(){
+  let h = JSON.parse(localStorage.getItem('dc_history')||'[]');
+  const el = $('historyList');
+  el.innerHTML = '';
+  h.forEach(id=>{
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.textContent = id;
+    c.onclick = ()=>{ $('userid').value = id; lookupUser(); };
+    el.appendChild(c);
+  });
+}
+
+/* ---------- badges (simple SVG icons) ---------- */
+const badgeIcons = {
+  "Discord Staff": '🛡',
+  "Partner": '💎',
+  "HypeSquad Events": '🎉',
+  "Bug Hunter L1": '🐞',
+  "Bug Hunter L2": '🐞✨',
+  "HypeSquad Bravery": '🦁',
+  "HypeSquad Brilliance": '🦉',
+  "HypeSquad Balance": '🐉',
+  "Early Supporter": '🎨',
+  "Verified Bot": '✅',
+  "Early Bot Dev": '🛠',
+  "Active Developer": '💻',
+  "Nitro": '🚀',
+  "Nitro Classic": '🚀✨'
+};
+
+/* ---------- main logic ---------- */
+async function lookupUser(){
+  const id = $('userid').value.trim();
+  if(!id){ alert('Please enter a Discord User ID'); return; }
+
+  // UI prep
+  $('result').style.display = 'none';
+  showLoader('Fetching user...');
+  $('copyUserBtn').style.display = 'none';
+
+  try {
+    const res = await fetch('/backend/lookup.php?id=' + encodeURIComponent(id));
+    if(!res.ok){
+      const text = await res.text().catch(()=>res.statusText);
+      hideLoader();
+      alert('Server error: ' + res.status + ' — ' + text);
+      return;
+    }
+    const data = await res.json();
+    hideLoader();
+
+    if(data.error){
+      alert('Error: ' + data.error);
+      return;
+    }
+
+    // Save history
+    saveHistory(data.id);
+
+    // Apply accent color as gentle gradient if provided
+    const card = document.getElementById('card');
+    if(data.accent_color){
+      card.style.background = `linear-gradient(180deg, ${data.accent_color}, rgba(0,0,0,0.36))`;
+    } else {
+      card.style.background = 'linear-gradient(180deg, rgba(0,0,0,0.28), rgba(0,0,0,0.36))';
+    }
+
+    // Banner
+    const bannerWrap = $('bannerWrap');
+    if(data.banner_url){
+      bannerWrap.innerHTML = `<a href="${data.banner_url}" target="_blank"><img class="banner" src="${data.banner_url}" alt="banner"></a>`;
+    } else bannerWrap.innerHTML = '';
+
+    // Avatar
+    $('avatar').src = data.avatar_url || '';
+    $('avatarLink').href = data.avatar_url || '#';
+
+    // name/id
+    $('nameLine').textContent = `${data.username}#${data.discriminator}`;
+    $('idLine').textContent = `ID: ${data.id}`;
+    $('created').textContent = `Created: ${data.created_at}`;
+
+    // bot tag
+    $('botTag').textContent = data.bot ? 'BOT ACCOUNT' : '';
+    $('botTag').style.display = data.bot ? 'inline-block' : 'none';
+
+    // badges
+    const badgesEl = $('badges');
+    badgesEl.innerHTML = '';
+    if(Array.isArray(data.badges) && data.badges.length){
+      data.badges.forEach(b=>{
+        const s = document.createElement('span');
+        s.className = 'badge';
+        const icon = badgeIcons[b] || '';
+        s.innerHTML = `<span style="font-size:14px">${icon}</span><span>${b}</span>`;
+        badgesEl.appendChild(s);
+      });
+    }
+
+    // bio
+    $('bio').textContent = data.bio || '';
+
+    // pronouns
+    $('pronouns').textContent = data.pronouns ? `Pronouns: ${data.pronouns}` : '';
+
+    // socials
+    const socials = $('socials');
+    socials.innerHTML = '';
+    if(data.connections && data.connections.length){
+      data.connections.forEach(c=>{
+        const a = document.createElement('a');
+        a.href = c.url || '#';
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.innerHTML = c.type === 'youtube' ? '▶ YouTube' :
+                      c.type === 'twitch' ? '🎮 Twitch' :
+                      c.type === 'twitter' ? '🐦 Twitter' :
+                      (c.type || 'Link');
+        socials.appendChild(a);
+      });
+    }
+
+    // Copy username#discriminator button
+    $('copyUserBtn').style.display = 'inline-block';
+    $('copyUserBtn').onclick = ()=> {
+      navigator.clipboard.writeText(`${data.username}#${data.discriminator}`).then(()=>alert('Copied username#discriminator'));
+    };
+
+    // show result
+    $('result').style.display = 'block';
+  } catch(e){
+    hideLoader();
+    alert('Fetch error: ' + e.message);
+  }
+}
+
+/* ---------- init ---------- */
+document.getElementById('searchBtn').addEventListener('click', lookupUser);
+document.getElementById('clearBtn').addEventListener('click', ()=>{ $('userid').value=''; $('result').style.display='none'; });
+$('userid').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') lookupUser(); });
+renderHistory();
+</script>
+</body>
+</html>
