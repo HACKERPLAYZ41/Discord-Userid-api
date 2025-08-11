@@ -1,7 +1,14 @@
 # Discord Profile Lookup API
 
 A Python-powered FastAPI + Discord.py bot that lets you fetch **detailed Discord user information** — including bio, pronouns, banners, badges, and linked accounts — through a REST API.  
-Can be paired with a PHP/JS frontend (`lookup.php`) for a full profile viewer.
+Paired with a PHP/JS frontend (`lookup.php`) for a full profile viewer.
+
+---
+
+## 🌐 Live Preview
+
+🚀 **Try it here:** [https://blockcode.space](https://blockcode.space)  
+*(Hosted version running this exact code)*
 
 ---
 
