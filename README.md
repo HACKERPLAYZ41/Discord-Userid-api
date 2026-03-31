@@ -43,7 +43,7 @@ Paired with a PHP/JS frontend (`lookup.php`) for a full profile viewer.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/yourusername/discord-profile-api.git
+git clone https://github.com/HACKERPLAYZ41/Discord-Userid-api.git
 cd discord-profile-api
 
 # 2. Create a virtual environment (optional but recommended)
